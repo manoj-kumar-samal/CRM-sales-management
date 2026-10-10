@@ -6,7 +6,16 @@ A RESTful backend that manages a company's whole sales process:
 
 Built with Node.js, Express and MongoDB. No frontend – use the included Postman collection.
 
-- **Deployed link:** `<add your Render/Railway URL here after deploying>` &nbsp;|&nbsp; Health check: `GET /health`
+
+## Live Demo
+
+- **Live API:** https://crm-sales-management-d8ou.onrender.com
+- **Health check:** https://crm-sales-management-d8ou.onrender.com/health
+- **Base URL:** https://crm-sales-management-d8ou.onrender.com/api/v1
+- **Postman collection:** `docs/CRM-Sales-API.postman_collection.json`
+
+> The app is hosted on a free tier, so the first request after a period of inactivity can take up to a minute.
+
 - **API documentation:** [`docs/CRM-Sales-API.postman_collection.json`](docs/CRM-Sales-API.postman_collection.json) (import into Postman) + the endpoint tables and samples below
 
 ---
@@ -379,5 +388,5 @@ Query efficiency: list endpoints run `find` + `countDocuments` in parallel, use 
 2. Push the repo to GitHub → Render → **New Web Service** → build `npm install`, start `npm start`.
 3. Add the environment variables from `.env.example` (`NODE_ENV=production`, `MONGO_URI`, both JWT secrets, `CLIENT_ORIGINS`, and `COOKIE_SAME_SITE=none` only if a frontend on another domain must use cookies; otherwise keep `strict` and use the Bearer token).
 4. Run the seed once from your machine with the production `MONGO_URI` (`npm run seed`) – it also builds the indexes.
-5. Put the URL at the top of this README and set Postman's `baseUrl` to `https://<your-app>.onrender.com/api/v1`.
+5. Put the URL at the top of this README and set Postman's `baseUrl` to `https://crm-sales-management-d8ou.onrender.com/api/v1`.
 
