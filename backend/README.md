@@ -6,7 +6,12 @@ A RESTful backend that manages a company's whole sales process:
 
 Built with Node.js, Express and MongoDB. No frontend – use the included Postman collection.
 
-- **Deployed link:** `<add your Render/Railway URL here after deploying>` &nbsp;|&nbsp; Health check: `GET /health`
+- **Deployed link:** 
+- **Live API:** https://crm-sales-management-d8ou.onrender.com
+- **Health check:** https://crm-sales-management-d8ou.onrender.com/health
+- **Base URL:** https://crm-sales-management-d8ou.onrender.com/api/v1
+- **Note:** hosted on a free tier, so the first request after idle can take up to a minute.
+
 - **API documentation:** [`docs/CRM-Sales-API.postman_collection.json`](docs/CRM-Sales-API.postman_collection.json) (import into Postman) + the endpoint tables and samples below
 
 ---
@@ -46,9 +51,9 @@ docs/              Postman collection
 git clone <your-repo>
 cd backend
 npm install
-cp .env.example .env      # then fill in the values
-npm run seed              # creates demo users + indexes
-npm run dev               # development (nodemon)   |   npm start  # production
+cp .env.example .env      
+npm run seed              
+npm run dev               
 ```
 
 ### Environment variables (`.env.example`)
@@ -379,8 +384,6 @@ Query efficiency: list endpoints run `find` + `countDocuments` in parallel, use 
 2. Push the repo to GitHub → Render → **New Web Service** → build `npm install`, start `npm start`.
 3. Add the environment variables from `.env.example` (`NODE_ENV=production`, `MONGO_URI`, both JWT secrets, `CLIENT_ORIGINS`, and `COOKIE_SAME_SITE=none` only if a frontend on another domain must use cookies; otherwise keep `strict` and use the Bearer token).
 4. Run the seed once from your machine with the production `MONGO_URI` (`npm run seed`) – it also builds the indexes.
-5. Put the URL at the top of this README and set Postman's `baseUrl` to `https://<your-app>.onrender.com/api/v1`.
+5. Put the URL at the top of this README and set Postman's `baseUrl` to `https://crm-sales-management-d8ou.onrender.com/api/v1`.
 
-## 12. Possible improvements (out of scope)
 
-Automated tests (Jest + supertest + mongodb-memory-server replica set), Swagger/OpenAPI generated from the Zod schemas, change-password / forgot-password flow, soft deletes, CSV export for reports, email/notification reminders for overdue activities.

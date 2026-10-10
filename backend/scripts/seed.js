@@ -31,7 +31,6 @@ const seed = async () => {
   await findOrCreate({ name: 'Ethan Executive', email: 'ethan@crm.com', password: DEMO_PASSWORD, role: ROLES.EXECUTIVE, manager: manager._id });
   await findOrCreate({ name: 'Priya Executive', email: 'priya@crm.com', password: DEMO_PASSWORD, role: ROLES.EXECUTIVE, manager: manager._id });
 
-  // make sure indexes exist (important when deploying to a fresh database)
   await Promise.all(Object.values(mongoose.models).map((m) => m.syncIndexes()));
 
   console.log('\nDemo password for manager/executives:', DEMO_PASSWORD);
