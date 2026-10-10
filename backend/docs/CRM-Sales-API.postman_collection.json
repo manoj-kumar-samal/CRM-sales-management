@@ -1,0 +1,1758 @@
+{
+  "info": {
+    "name": "CRM Sales Management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Backend API for the CRM Sales Management System.\n\n**Quick start:** 1) `npm run seed` 2) run *Auth > Login* (the token is saved automatically) 3) set `managerId` / `executiveId` from *Users > List users* 4) walk the folders top to bottom.\n\n**Auth:** JWT access token (15 min) sent as `Authorization: Bearer <token>` (collection-level auth) or via the httpOnly `accessToken` cookie. Refresh token (7 days) lives in an httpOnly cookie.\n\n**Success response:** `{ \"success\": true, \"message\": \"...\", \"data\": {...}, \"pagination\": {...} }` (pagination only on lists: currentPage, pageSize, totalRecords, totalPages)\n\n**Error response:** `{ \"success\": false, \"message\": \"...\", \"errors\": [{ \"field\": \"body.email\", \"message\": \"Invalid email address\" }] }` (`errors` only for validation failures)\n\n**Status codes:** 400 validation / invalid business rule, 401 not logged in or bad token, 403 role or ownership forbids it, 404 not found, 409 conflict (duplicate / already converted / closed deal), 429 rate limited, 500 unexpected."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// future date used in request bodies (closing dates / due dates must not be in the past)",
+          "pm.collectionVariables.set('futureDate', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "managerId",
+      "value": ""
+    },
+    {
+      "key": "executiveId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "leadId",
+      "value": ""
+    },
+    {
+      "key": "customerId",
+      "value": ""
+    },
+    {
+      "key": "dealId",
+      "value": ""
+    },
+    {
+      "key": "activityId",
+      "value": ""
+    },
+    {
+      "key": "futureDate",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Register (creates a sales executive)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Public\n\n**Possible errors:** 400 validation, 409 email already exists, 429 rate limited",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ravi Kumar\",\n  \"email\": \"ravi@crm.com\",\n  \"phone\": \"+91 98765 43210\",\n  \"password\": \"Password@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Public\n\n**Possible errors:** 400 validation, 401 invalid credentials, 403 account deactivated, 429 rate limited\n\nReturns the access token in the body AND sets httpOnly cookies (accessToken, refreshToken). The test script stores the token in {{accessToken}}. Login as manager@crm.com / Password@123 or ethan@crm.com to test other roles.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@crm.com\",\n  \"password\": \"Admin@12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) { pm.collectionVariables.set('accessToken', j.data.accessToken); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Public (needs the refreshToken cookie)\n\n**Possible errors:** 401 missing/invalid refresh token\n\nRotates the refresh token. The cookie is sent automatically by Postman after login.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) { pm.collectionVariables.set('accessToken', j.data.accessToken); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get current user (me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Name\",\n  \"phone\": \"+91 90000 00000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nInvalidates the refresh token and clears cookies."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Users (admin)",
+      "item": [
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400 validation, 403, 409 duplicate email\n\nrole: admin | sales_manager | sales_executive. `manager` is only used for executives.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sam Sales\",\n  \"email\": \"sam@crm.com\",\n  \"phone\": \"+91 98765 11111\",\n  \"password\": \"Password@123\",\n  \"role\": \"sales_executive\",\n  \"manager\": \"{{managerId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('userId', pm.response.json().data._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": false
+                },
+                {
+                  "key": "search",
+                  "value": "sam",
+                  "disabled": true
+                },
+                {
+                  "key": "role",
+                  "value": "sales_executive",
+                  "disabled": true
+                },
+                {
+                  "key": "isActive",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "asc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "List assignable executives",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/assignable",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "assignable"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nActive sales executives the caller can assign work to (managers: own team only)."
+          }
+        },
+        {
+          "name": "Get user by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400, 403, 404, 409",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Samuel Sales\",\n  \"role\": \"sales_executive\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Activate / deactivate user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400 (cannot deactivate yourself), 403, 404",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "{{userId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 400 (self), 403, 404, 409 (user owns CRM records - deactivate instead)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Leads",
+      "item": [
+        {
+          "name": "Create lead",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 401, 403 (executive assigning to someone else), 404\n\nExecutives: lead is auto-assigned to themselves. Admin/Manager: `assignedTo` optional (must be an active executive; managers: own team).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Anita Sharma\",\n  \"email\": \"anita@acme.com\",\n  \"phone\": \"+91 99999 88888\",\n  \"company\": \"Acme Corp\",\n  \"source\": \"Website\",\n  \"priority\": \"High\",\n  \"description\": \"Interested in the enterprise plan\",\n  \"assignedTo\": \"{{executiveId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('leadId', pm.response.json().data._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List leads (search / filter / sort / paginate)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leads?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "Qualified",
+                  "disabled": true
+                },
+                {
+                  "key": "priority",
+                  "value": "High",
+                  "disabled": true
+                },
+                {
+                  "key": "source",
+                  "value": "Website",
+                  "disabled": true
+                },
+                {
+                  "key": "assignedTo",
+                  "value": "{{executiveId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "unassigned",
+                  "value": "true",
+                  "disabled": true
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "createdTo",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "acme",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nAdmin: all leads. Manager: team + unassigned. Executive: only own leads. Filters can be combined."
+          }
+        },
+        {
+          "name": "Get lead by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update lead",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 403, 404, 409 (converted)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"priority\": \"Medium\",\n  \"company\": \"Acme Corporation\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update lead status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 (invalid transition / use /convert), 403, 404, 409\n\nFlow: New -> Contacted -> Qualified. Converted only via /convert.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Contacted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Assign / reassign lead",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}",
+                "assign"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 400 (inactive / not an executive), 403 (not in your team), 404, 409",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedTo\": \"{{executiveId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Convert lead to customer + deal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}/convert",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}",
+                "convert"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 (lead not Qualified / unassigned / bad closing date), 403, 404, 409 (already converted / duplicate customer email)\n\nRuns inside a MongoDB transaction - customer, deal, lead update and timeline entries are created together or not at all.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer\": {\n    \"address\": {\n      \"street\": \"12 MG Road\",\n      \"city\": \"Hyderabad\",\n      \"state\": \"Telangana\",\n      \"country\": \"India\",\n      \"zipCode\": \"500001\"\n    }\n  },\n  \"deal\": {\n    \"dealName\": \"Acme Enterprise Plan\",\n    \"value\": 50000,\n    \"probability\": 20,\n    \"expectedClosingDate\": \"{{futureDate}}\",\n    \"description\": \"First-year contract\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.success) { pm.collectionVariables.set('customerId', j.data.customer._id); pm.collectionVariables.set('dealId', j.data.deal._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lead timeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}/timeline?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}",
+                "timeline"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Delete lead",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "leads",
+                "{{leadId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 403, 404, 409 (converted leads cannot be deleted)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Customers",
+      "item": [
+        {
+          "name": "Create customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 403, 409 duplicate email",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rohit Verma\",\n  \"email\": \"rohit@globex.com\",\n  \"phone\": \"+91 98888 77777\",\n  \"company\": \"Globex\",\n  \"address\": {\n    \"city\": \"Mumbai\",\n    \"country\": \"India\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('customerId', pm.response.json().data._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List customers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "Active",
+                  "disabled": true
+                },
+                {
+                  "key": "assignedTo",
+                  "value": "{{executiveId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "createdTo",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "globex",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "asc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Get customer (with original lead + deals)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 403, 404, 409",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Inactive\",\n  \"phone\": \"+91 90000 12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Reassign customer",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}",
+                "assign"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedTo\": \"{{executiveId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Customer timeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}/timeline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}",
+                "timeline"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Delete customer",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/{{customerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                "{{customerId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin\n\n**Possible errors:** 403, 404, 409 (has deals / created from a lead)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Deals",
+      "item": [
+        {
+          "name": "Create deal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 (value <= 0, probability outside 0-100, closing date in the past), 403, 404\n\nexpectedRevenue is calculated by the server (value x probability / 100).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dealName\": \"Globex Support Contract\",\n  \"customer\": \"{{customerId}}\",\n  \"value\": 25000,\n  \"probability\": 25,\n  \"expectedClosingDate\": \"{{futureDate}}\",\n  \"description\": \"Annual support\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('dealId', pm.response.json().data._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List deals",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deals?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": false
+                },
+                {
+                  "key": "stage",
+                  "value": "Proposal",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "Open",
+                  "disabled": true
+                },
+                {
+                  "key": "assignedTo",
+                  "value": "{{executiveId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "minAmount",
+                  "value": "10000",
+                  "disabled": true
+                },
+                {
+                  "key": "maxAmount",
+                  "value": "100000",
+                  "disabled": true
+                },
+                {
+                  "key": "closingFrom",
+                  "value": "2026-10-01",
+                  "disabled": true
+                },
+                {
+                  "key": "closingTo",
+                  "value": "2027-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "globex",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "value",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "desc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Get deal by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update deal",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 403, 404, 409 (closed deals are read-only)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": 30000,\n  \"probability\": 40\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Change stage (move forward)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}",
+                "stage"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 (invalid transition), 403, 404, 409 (closed deal)\n\nAllowed: Qualification -> Discovery -> Proposal -> Negotiation -> Won. Any open stage -> Lost. Won/Lost are final.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"Discovery\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mark deal Won",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}",
+                "stage"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nOnly from Negotiation. Probability is forced to 100.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"Won\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mark deal Lost",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/stage",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}",
+                "stage"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nlostReason is required (min 5 chars). Probability is forced to 0.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"Lost\",\n  \"lostReason\": \"Customer chose a competitor\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Assign / reassign deal",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}",
+                "assign"
+              ],
+              "query": []
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 400, 403, 404, 409 (closed)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignedTo\": \"{{executiveId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Deal timeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/deals/{{dealId}}/timeline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "deals",
+                "{{dealId}}",
+                "timeline"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Activities",
+      "item": [
+        {
+          "name": "Create follow-up activity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 (missing dueDate / due date in the past), 403, 404\n\ntype: Call | Email | Meeting | Demo | Follow-up | Reminder | Note. relatedModel: Lead | Customer | Deal | User.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Follow-up\",\n  \"title\": \"Call Anita about pricing\",\n  \"description\": \"Discuss the enterprise quote\",\n  \"dueDate\": \"{{futureDate}}\",\n  \"relatedModel\": \"Lead\",\n  \"relatedTo\": \"{{leadId}}\",\n  \"assignedTo\": \"{{executiveId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code < 300) { pm.collectionVariables.set('activityId', pm.response.json().data._id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add note",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nNotes need no due date and are saved as Completed.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"Note\",\n  \"title\": \"Spoke to Anita\",\n  \"description\": \"She wants a demo next week\",\n  \"relatedModel\": \"Lead\",\n  \"relatedTo\": \"{{leadId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "List activities",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "disabled": false
+                },
+                {
+                  "key": "status",
+                  "value": "Overdue",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "Call",
+                  "disabled": true
+                },
+                {
+                  "key": "assignedTo",
+                  "value": "{{executiveId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "relatedModel",
+                  "value": "Lead",
+                  "disabled": true
+                },
+                {
+                  "key": "relatedTo",
+                  "value": "{{leadId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "dueFrom",
+                  "value": "2026-10-01",
+                  "disabled": true
+                },
+                {
+                  "key": "dueTo",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "pricing",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "dueDate",
+                  "disabled": true
+                },
+                {
+                  "key": "order",
+                  "value": "asc",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nstatus=Overdue is calculated by the server: still pending and due date already passed."
+          }
+        },
+        {
+          "name": "Get activity by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found"
+          }
+        },
+        {
+          "name": "Update activity",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400, 403, 404, 409 (completed)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Call Anita - final quote\",\n  \"dueDate\": \"{{futureDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Mark activity completed",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}/complete",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}",
+                "complete"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 403, 404, 409 (already completed)"
+          }
+        },
+        {
+          "name": "Delete activity",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/activities/{{activityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "activities",
+                "{{activityId}}"
+              ],
+              "query": []
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 403 (executives can only delete their own), 404"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Dashboard & Analytics",
+      "item": [
+        {
+          "name": "Sales statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "stats"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nAdmin: whole company. Manager: own team. Executive: own records. Optional created-date range."
+          }
+        },
+        {
+          "name": "Sales pipeline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/pipeline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "pipeline"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** All logged-in users\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nCount, total value and expected revenue of deals at every stage."
+          }
+        },
+        {
+          "name": "Team performance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/dashboard/team-performance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboard",
+                "team-performance"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "**Access:** Admin, Sales Manager\n\n**Possible errors:** 400 validation, 401 unauthenticated, 403 forbidden, 404 not found\n\nPer-executive leads, conversion rate, deals, revenue and activities (managers: own team)."
+          }
+        }
+      ]
+    }
+  ]
+}
