@@ -52,12 +52,12 @@ docs/              Postman collection
 ## 3. Installation & setup
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/manoj-kumar-samal/CRM-sales-management.git
 cd backend
 npm install
-cp .env.example .env      # then fill in the values
-npm run seed              # creates demo users + indexes
-npm run dev               # development (nodemon)   |   npm start  # production
+cp .env.example .env      
+npm run seed             
+npm run dev               
 ```
 
 ### Environment variables (`.env.example`)
